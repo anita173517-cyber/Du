@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Ultimate Project Path Finder & Build
+        run: |
+          echo "Searching for actual Android project root..."
+          
+          # Find the exact directory that contains settings.gradle or build.gradle (ignoring git folders)
+          PROJECT_PATH=""
+          for f in $(find . -name "settings.gradle*" -o -name "build.gradle*"); do
+            DIR=$(dirname "$f")
+            if [ "$DIR" != "." ]; then
+              PROJECT_PATH="$DIR"
+              break
+            fi
+          done
+          
+          if [ -n "$PROJECT_PATH" ]; then
+            echo "Entering project directory: $PROJECT_PATH"
+            cd "$PROJECT_PATH"
+          else
+            echo "Working in root directory"
+          fi
+          
+          # Check and setup Gradle wrapper inside the project folder
+          if [ ! -f "./gradlew" ]; then
+            echo "Generating Gradle wrapper..."
+            gradle wrapper --gradle-version 8.5
+          fi
+          
+          chmod +x gradlew
+          echo "Starting APK build process..."
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload Built APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: '**/build/outputs/apk/release/*.apk'
+          
